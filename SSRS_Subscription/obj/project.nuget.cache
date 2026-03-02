@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "/7J9vDQT1ik=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\it_osbi1_support\\Documents\\VSCodeProjects\\SSRS Sub\\SSRS_Subscription\\SSRS_Subscription.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\it_osbi1_support\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.0\\microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512",
+    "C:\\Users\\it_osbi1_support\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

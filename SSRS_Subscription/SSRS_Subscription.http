@@ -1,0 +1,6 @@
+@SSRS_Subscription_HostAddress = http://localhost:5065
+
+GET {{SSRS_Subscription_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
