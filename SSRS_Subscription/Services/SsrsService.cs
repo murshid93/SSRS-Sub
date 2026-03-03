@@ -106,7 +106,12 @@ namespace SSRS_Subscription.Services
                         new { Name = "IncludeLink", Value = "False" },
                         new { Name = "RenderFormat", Value = _settings.DefaultRenderFormat },
                         new { Name = "Subject", Value = request.Subject },
-                        new { Name = "Priority", Value = "NORMAL" }
+                 //     new { Name = "Comment", Value = "Dear User,\n\nPlease find the attached report.\n\nRegards,\nBI Team" },
+                        new { Name = "Priority", Value = "NORMAL" },
+                 //       new { Name = "Comment", Value = string.IsNullOrWhiteSpace(request.Comment) ? $"Dear {(request.EmailTo.Contains("@") ? request.EmailTo.Split('@')[0] : request.EmailTo)},\n\nPlease find attached the report {request.Subject} generated on {DateTime.Now:dd-MMM-yyyy hh:mm tt}.\n\nRegards,\nBI Team" : request.Comment },
+                 //       new { Name = "Comment", Value = !string.IsNullOrWhiteSpace(request.Comment) ? request.Comment : $"Dear {(string.IsNullOrWhiteSpace(request.EmailTo) ? "User" : (request.EmailTo.Contains("@") ? request.EmailTo.Split('@')[0] : request.EmailTo))},\n\nPlease find attached the report {(string.IsNullOrWhiteSpace(request.Subject) ? "Report" : request.Subject)} generated on {DateTime.Now:dd-MMM-yyyy hh:mm tt}.\n\nRegards,\nBI Team" },
+                 //      new { Name = "Comment", Value = (!string.IsNullOrWhiteSpace(request.Comment) && !request.Comment.Contains("api", StringComparison.OrdinalIgnoreCase)) ? request.Comment : $"Dear {(string.IsNullOrWhiteSpace(request.EmailTo) ? "User" : (request.EmailTo.Contains("@") ? request.EmailTo.Split('@')[0] : request.EmailTo))},\n\nPlease find attached the report {(string.IsNullOrWhiteSpace(request.Subject) ? "Report" : request.Subject)} generated on {DateTime.Now:dd-MMM-yyyy hh:mm tt}.\n\nRegards,\nBI Team" },
+                        new { Name = "Comment", Value = $"Dear {(request.EmailTo?.Split('@')[0] ?? "User")},\n\nPlease find the attached report.\n\nRegards,\nBI Team" },
                     }
                 },
 

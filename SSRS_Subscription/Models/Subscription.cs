@@ -12,7 +12,7 @@ namespace SSRS_Subscription.Models
         
         public string Comment { get; set; } = string.Empty;
 
-        // Uses 'object' to handle the Union[str, List[str]] behavior from Python
+        
         public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
     }
 }

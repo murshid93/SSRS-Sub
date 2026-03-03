@@ -30,12 +30,9 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// ==========================================
-// 🚨 DIAGNOSTIC TEST ENDPOINT
-// ==========================================
+
 app.MapGet("/ping", () => "The .NET router is alive and well!");
 
-// Enable routing and map controllers (NO HttpsRedirection middleware)
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();

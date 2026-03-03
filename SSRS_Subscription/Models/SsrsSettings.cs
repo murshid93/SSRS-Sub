@@ -13,5 +13,6 @@ namespace SSRS_Subscription.Models
         public string DefaultEmailTo { get; set; } = string.Empty;
         
         public string DefaultRenderFormat { get; set; } = "PDF";
+        public string DefaultEmailBody { get; set; } = string.Empty;
     }
 }
