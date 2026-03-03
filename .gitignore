@@ -5,5 +5,5 @@ obj/
 *.dll
 *.pdb
 .vs/
-appsettings.json
+appsettings.Development.json
 *.tar
