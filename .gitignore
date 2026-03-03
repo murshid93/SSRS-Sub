@@ -1,1 +1,7 @@
-SSRS_Subscription/appsettings.json
+bin/
+obj/
+*.user
+*.exe
+*.dll
+*.pdb
+.vs/
