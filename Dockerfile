@@ -17,10 +17,11 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-# 🚨 IMPORTANT: Install the NTLM libraries in the RUNTIME stage
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:8080
+
 RUN apt-get update && apt-get install -y gss-ntlmssp
 
-# Copy the compiled app from the build stage
 COPY --from=build /app/publish .
 
 EXPOSE 8080

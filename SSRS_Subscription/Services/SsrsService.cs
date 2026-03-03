@@ -109,7 +109,7 @@ namespace SSRS_Subscription.Services
                  //     new { Name = "Comment", Value = "Dear User,\n\nPlease find the attached report.\n\nRegards,\nBI Team" },
                         new { Name = "Priority", Value = "NORMAL" },
                         new { Name = "Comment", Value = (!string.IsNullOrWhiteSpace(request.Comment) && !request.Comment.Contains("api", StringComparison.OrdinalIgnoreCase)) ? request.Comment : $"Dear {(string.IsNullOrWhiteSpace(request.EmailTo) ? "User" : (request.EmailTo.Contains("@") ? request.EmailTo.Split('@')[0] : request.EmailTo))},\n\nAttached is the {(string.IsNullOrWhiteSpace(request.Subject) ? "Report" : request.Subject)}\n\nNote: Please do NOT reply to this message. This is a system generated and outgoing message only.\n\nIf you have any queries or comments, please call to Corporate Information Technology Department, Aspial Corporation Limited." }
-                 //       new { Name = "Comment", Value = $"Dear {(request.EmailTo?.Split('@')[0] ?? "User")},\n\nPlease find the attached report.\n\nRegards,\nBI Team" },
+
                     }
                 },
 
