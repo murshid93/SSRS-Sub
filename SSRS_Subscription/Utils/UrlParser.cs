@@ -8,10 +8,11 @@ namespace SSRS_Subscription.Utils
 {
     public static class UrlParser
     {
-        // 1. Moved to a class-level variable and made case-insensitive for safety
+        // 1. Added the new File Share keys and DeliveryMethod to the ignore list
         private static readonly HashSet<string> TopLevelKeys = new(StringComparer.OrdinalIgnoreCase) 
         { 
-            "report_path", "email_to", "subject", "comment" 
+            "report_path", "email_to", "subject", "comment", 
+            "delivery_method", "file_path", "file_name", "file_username", "file_password"
         };
 
         public static SubscriptionRequest ParseReportUrl(string urlString)
@@ -23,17 +24,43 @@ namespace SSRS_Subscription.Utils
 
             var queryParams = QueryHelpers.ParseQuery(uri.Query);
 
-            // 2. Used TryGetValue for safer and cleaner dictionary access
+            // Extract core path
             var reportPath = queryParams.TryGetValue("report_path", out var pathVal) ? pathVal.ToString() : string.Empty;
-            var emailTo = queryParams.TryGetValue("email_to", out var emailVal) ? emailVal.ToString() : string.Empty;
-
-            // 3. Upgraded to IsNullOrWhiteSpace to catch spaces-only inputs
-            if (string.IsNullOrWhiteSpace(reportPath) || string.IsNullOrWhiteSpace(emailTo))
+            if (string.IsNullOrWhiteSpace(reportPath))
             {
-                throw new ArgumentException("URL is missing required parameters: 'report_path' or 'email_to'.");
+                throw new ArgumentException("URL is missing the required parameter: 'report_path'.");
             }
 
-            // 4. Replaced the foreach loop with a clean LINQ expression
+            // 2. Determine Delivery Method (Default to Email if not provided or misspelled)
+            var deliveryMethodStr = queryParams.TryGetValue("delivery_method", out var dmVal) ? dmVal.ToString() : "Email";
+            if (!Enum.TryParse<DeliveryMethod>(deliveryMethodStr, true, out var deliveryMethod))
+            {
+                deliveryMethod = DeliveryMethod.Email; 
+            }
+
+            // Extract Email fields
+            var emailTo = queryParams.TryGetValue("email_to", out var emailVal) ? emailVal.ToString() : string.Empty;
+            
+            // 3. Conditional Validation based on Delivery Method
+            if (deliveryMethod == DeliveryMethod.Email && string.IsNullOrWhiteSpace(emailTo))
+            {
+                throw new ArgumentException("URL is missing the required parameter 'email_to' for Email delivery.");
+            }
+
+            // Extract File Share fields
+            var filePath = queryParams.TryGetValue("file_path", out var fpVal) ? fpVal.ToString() : string.Empty;
+            var fileName = queryParams.TryGetValue("file_name", out var fnVal) ? fnVal.ToString() : string.Empty;
+            var fileUsername = queryParams.TryGetValue("file_username", out var fuVal) ? fuVal.ToString() : string.Empty;
+            var filePassword = queryParams.TryGetValue("file_password", out var fpassVal) ? fpassVal.ToString() : string.Empty;
+
+            // Extract Subject (prioritize URL parameter, fallback to report name)
+            var subject = queryParams.TryGetValue("subject", out var subVal) && !string.IsNullOrWhiteSpace(subVal.ToString()) 
+                ? subVal.ToString() 
+                : reportPath.TrimEnd('/').Split('/').LastOrDefault() ?? string.Empty;
+
+            var comment = queryParams.TryGetValue("comment", out var commentVal) ? commentVal.ToString() : string.Empty;
+
+            // Extract dynamic SSRS Report Parameters
             var parameters = queryParams
                 .Where(kvp => !TopLevelKeys.Contains(kvp.Key))
                 .ToDictionary(
@@ -44,25 +71,33 @@ namespace SSRS_Subscription.Utils
             return new SubscriptionRequest
             {
                 ReportPath = reportPath,
+                DeliveryMethod = deliveryMethod,
+                
+                // Email fields
                 EmailTo = emailTo,
-                Subject = reportPath.TrimEnd('/').Split('/').LastOrDefault() ?? string.Empty,
-                Comment = queryParams.TryGetValue("comment", out var commentVal) ? commentVal.ToString() : string.Empty,
+                Subject = subject,
+                Comment = comment,
+                
+                // File Share fields
+                FilePath = filePath,
+                FileName = fileName,
+                FileUserName = fileUsername,
+                FilePassword = filePassword,
+                
+                // SSRS Parameters
                 Parameters = parameters
             };
         }
 
-        // 5. Extracted the complex parameter logic into a dedicated, null-safe helper method
         private static object ProcessParameterValues(string?[] values)
         {
             var firstValue = values.FirstOrDefault();
 
-            // Handle single comma-separated strings safely
             if (values.Length == 1 && !string.IsNullOrWhiteSpace(firstValue) && firstValue.Contains(','))
             {
                 return firstValue.Split(',').Select(v => v.Trim()).ToList();
             }
 
-            // Fallback: treat as a standard list of strings, filtering out any accidental nulls
             return values.Where(v => v != null).ToList()!;
         }
     }

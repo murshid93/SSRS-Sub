@@ -14,5 +14,11 @@ namespace SSRS_Subscription.Models
         
         public string DefaultRenderFormat { get; set; } = "PDF";
         public string DefaultEmailBody { get; set; } = string.Empty;
-    }
+        
+
+    // ... your existing settings ...
+          public string DefaultFileSharePath { get; set; } = string.Empty;
+          public string DefaultFileShareUsername { get; set; } = string.Empty;
+         public string DefaultFileSharePassword { get; set; } = string.Empty;
 }
+    }
