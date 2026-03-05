@@ -1,9 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection; // Added for IServiceScopeFactory
 using SSRS_Subscription.Models;
 using SSRS_Subscription.Services;
-using SSRS_Subscription.Utils; // Added to access UrlParser
+using SSRS_Subscription.Utils; 
 
 namespace SSRS_Subscription.Controllers
 {
@@ -17,10 +18,12 @@ namespace SSRS_Subscription.Controllers
     public class SubscriptionController : ControllerBase
     {
         private readonly ISsrsService _service;
+        private readonly IServiceScopeFactory _scopeFactory; // Added to handle background tasks safely
 
-        public SubscriptionController(ISsrsService service)
+        public SubscriptionController(ISsrsService service, IServiceScopeFactory scopeFactory)
         {
             _service = service;
+            _scopeFactory = scopeFactory;
         }
 
         // ✅ Route 1: JSON Payload Endpoint
@@ -29,15 +32,29 @@ namespace SSRS_Subscription.Controllers
         {
             try
             {
-                var subId = await _service.CreateDataDrivenSubscriptionAsync(req);
+                // Unpack the tuple to get both the ID and the calculated path
+                var (subId, targetPath) = await _service.CreateDataDrivenSubscriptionAsync(req);
                 await _service.TriggerSubscriptionAsync(subId);
+
+                // Start background polling if it is a FileShare and needs an email
+                if (req.DeliveryMethod == DeliveryMethod.FileShare && !string.IsNullOrWhiteSpace(req.EmailTo))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var backgroundService = scope.ServiceProvider.GetRequiredService<ISsrsService>();
+                        await backgroundService.PollAndNotifyAsync(subId, req.EmailTo, req.Subject, targetPath);
+                    });
+                }
 
                 return Ok(new
                 {
                     status = "success",
                     subscription_id = subId,
-                    // Dynamically injects "Email" or "FileShare"
-                    message = $"Report delivery triggered via {req.DeliveryMethod} (JSON Payload)"
+                    message = (req.DeliveryMethod == DeliveryMethod.FileShare && !string.IsNullOrWhiteSpace(req.EmailTo))
+                        ? $"Report delivery triggered via {req.DeliveryMethod}. Email notification will be sent when saved."
+                        : $"Report delivery triggered via {req.DeliveryMethod} (JSON Payload)",
+                    expected_destination = targetPath
                 });
             }
             catch (ArgumentException ex)
@@ -56,19 +73,31 @@ namespace SSRS_Subscription.Controllers
         {
             try
             {
-                // 1. Parse the URL right here in the controller
                 var parsedRequest = UrlParser.ParseReportUrl(req.Url);
 
-                // 2. Pass the fully parsed model to the service
-                var subId = await _service.CreateDataDrivenSubscriptionAsync(parsedRequest);
+                // Unpack the tuple
+                var (subId, targetPath) = await _service.CreateDataDrivenSubscriptionAsync(parsedRequest);
                 await _service.TriggerSubscriptionAsync(subId);
+
+                // Start background polling if it is a FileShare and needs an email
+                if (parsedRequest.DeliveryMethod == DeliveryMethod.FileShare && !string.IsNullOrWhiteSpace(parsedRequest.EmailTo))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var backgroundService = scope.ServiceProvider.GetRequiredService<ISsrsService>();
+                        await backgroundService.PollAndNotifyAsync(subId, parsedRequest.EmailTo, parsedRequest.Subject, targetPath);
+                    });
+                }
 
                 return Ok(new
                 {
                     status = "success",
                     subscription_id = subId,
-                    // Now we can dynamically read the DeliveryMethod from the parsed request!
-                    message = $"Report delivery triggered via {parsedRequest.DeliveryMethod} (URL Parsed)"
+                    message = (parsedRequest.DeliveryMethod == DeliveryMethod.FileShare && !string.IsNullOrWhiteSpace(parsedRequest.EmailTo))
+                        ? $"Report delivery triggered via {parsedRequest.DeliveryMethod}. Email notification will be sent when saved."
+                        : $"Report delivery triggered via {parsedRequest.DeliveryMethod} (URL Parsed)",
+                    expected_destination = targetPath
                 });
             }
             catch (ArgumentException ex)

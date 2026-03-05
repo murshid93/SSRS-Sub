@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration; // Added for SMTP settings
 using Microsoft.Extensions.Options;
 using SSRS_Subscription.Models;
 using SSRS_Subscription.Utils;
@@ -17,6 +18,7 @@ namespace SSRS_Subscription.Services
     {
         private readonly HttpClient _httpClient;
         private readonly SsrsSettings _settings;
+        private readonly IConfiguration _config; // Added configuration
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -24,10 +26,12 @@ namespace SSRS_Subscription.Services
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        public SsrsService(HttpClient httpClient, IOptions<SsrsSettings> options)
+        // Inject IConfiguration here
+        public SsrsService(HttpClient httpClient, IOptions<SsrsSettings> options, IConfiguration config)
         {
             _httpClient = httpClient;
             _settings = options.Value;
+            _config = config;
         }
 
         private async Task<string> GetReportIdAsync(string reportPath)
@@ -53,7 +57,8 @@ namespace SSRS_Subscription.Services
             return items[0].GetProperty("Id").GetString()!;
         }
 
-        public async Task<string> CreateDataDrivenSubscriptionAsync(SubscriptionRequest request)
+        // Updated signature to return the Tuple
+        public async Task<(string SubscriptionId, string TargetPath)> CreateDataDrivenSubscriptionAsync(SubscriptionRequest request)
         {
             var reportParams = new List<object>();
 
@@ -78,17 +83,23 @@ namespace SSRS_Subscription.Services
             // 2. Determine Extension Settings based on Delivery Method
             string deliveryExtension;
             object extensionSettings;
+            string expectedPath = string.Empty; // Added variable to hold the path
 
             if (request.DeliveryMethod == DeliveryMethod.FileShare)
             {
+                var finalPath = string.IsNullOrWhiteSpace(request.FilePath) ? _settings.DefaultFileSharePath : request.FilePath;
+                var finalFileName = string.IsNullOrWhiteSpace(request.FileName) ? "@ReportName" : request.FileName;
+                
+                // Calculate the expected path to return to the controller
+                expectedPath = $@"{finalPath}\{finalFileName}.{_settings.DefaultRenderFormat.ToLower()}";
+
                 deliveryExtension = "Report Server FileShare";
                 extensionSettings = new
                 {
                     ParameterValues = new[]
                     {
-                        // Using properties we discussed adding to SsrsSettings for fallbacks
-                        new { Name = "PATH", Value = string.IsNullOrWhiteSpace(request.FilePath) ? _settings.DefaultFileSharePath : request.FilePath },
-                        new { Name = "FILENAME", Value = string.IsNullOrWhiteSpace(request.FileName) ? "@ReportName" : request.FileName },
+                        new { Name = "PATH", Value = finalPath },
+                        new { Name = "FILENAME", Value = finalFileName },
                         new { Name = "FILEEXTN", Value = "True" },
                         new { Name = "USERNAME", Value = string.IsNullOrWhiteSpace(request.FileUserName) ? _settings.DefaultFileShareUsername : request.FileUserName },
                         new { Name = "PASSWORD", Value = string.IsNullOrWhiteSpace(request.FilePassword) ? _settings.DefaultFileSharePassword : request.FilePassword },
@@ -99,13 +110,15 @@ namespace SSRS_Subscription.Services
             }
             else // Default to Email
             {
+                expectedPath = request.EmailTo; // The "path" is just the email
+
                 deliveryExtension = "Report Server Email";
                 extensionSettings = new
                 {
                     ParameterValues = new[]
                     {
                         new { Name = "TO", Value = request.EmailTo },
-                        new { Name = "ReplyTo", Value = request.EmailTo }, // Could also be mapped to a default setting if needed
+                        new { Name = "ReplyTo", Value = request.EmailTo }, 
                         new { Name = "IncludeReport", Value = "True" },
                         new { Name = "IncludeLink", Value = "False" },
                         new { Name = "RenderFormat", Value = _settings.DefaultRenderFormat },
@@ -154,7 +167,9 @@ namespace SSRS_Subscription.Services
             }
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-            return result.GetProperty("Id").GetString()!;
+            
+            // Return BOTH the ID and the calculated path
+            return (result.GetProperty("Id").GetString()!, expectedPath);
         }
 
         public async Task TriggerSubscriptionAsync(string subscriptionId)
@@ -173,14 +188,55 @@ namespace SSRS_Subscription.Services
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task<string> ProcessSubscriptionFromUrlAsync(string url)
+        // ✅ NEW: Method to get SSRS Status
+        public async Task<string> GetSubscriptionStatusAsync(string subscriptionId)
         {
-            var request = UrlParser.ParseReportUrl(url);
+            var response = await _httpClient.GetAsync($"Subscriptions({subscriptionId})");
+            response.EnsureSuccessStatusCode();
+            
+            var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+            
+            if (content.TryGetProperty("LastStatus", out var lastStatus))
+            {
+                return lastStatus.GetString() ?? string.Empty;
+            }
+            return string.Empty;
+        }
 
-            var subId = await CreateDataDrivenSubscriptionAsync(request);
-            await TriggerSubscriptionAsync(subId);
+        // ✅ NEW: Background Polling Method
+        // ✅ NEW: Background Polling Method (Simplified)
+        public async Task PollAndNotifyAsync(string subscriptionId, string emailTo, string subject, string fallbackPath)
+        {
+            int maxAttempts = 30; // Max 5 minutes
+            int delayMs = 10000; // Check every 10 seconds
 
-            return subId;
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                await Task.Delay(delayMs);
+                
+                var currentStatus = await GetSubscriptionStatusAsync(subscriptionId);
+
+                // SSRS File Share success string check
+                if (currentStatus.Contains("has been saved", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Grab SMTP settings and fire email using our pre-calculated expected path
+                    var smtpServer = _config["SmtpSettings:Server"];
+                    var smtpPort = int.Parse(_config["SmtpSettings:Port"] ?? "587");
+                    var senderEmail = _config["SmtpSettings:SenderEmail"];
+                    var smtpUser = _config["SmtpSettings:Username"];
+                    var smtpPass = _config["SmtpSettings:Password"];
+
+                    // We now pass 'fallbackPath' directly!
+                    await EmailHelper.SendFileReadyNotificationAsync(emailTo, subject, fallbackPath, smtpServer, smtpPort, senderEmail, smtpUser, smtpPass);
+                    return; // Exit loop!
+                }
+                else if (currentStatus.Contains("Failure", StringComparison.OrdinalIgnoreCase) || currentStatus.Contains("Error"))
+                {
+                    Console.WriteLine($"[ERROR] SSRS failed to save {subscriptionId}. Status: {currentStatus}");
+                    return; // Exit loop!
+                }
+            }
+            Console.WriteLine($"[TIMEOUT] Stopped polling {subscriptionId}.");
         }
     }
 }
