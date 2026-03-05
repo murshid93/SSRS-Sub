@@ -20,5 +20,9 @@ namespace SSRS_Subscription.Models
           public string DefaultFileSharePath { get; set; } = string.Empty;
           public string DefaultFileShareUsername { get; set; } = string.Empty;
          public string DefaultFileSharePassword { get; set; } = string.Empty;
+         
+
+         
+
 }
     }
