@@ -8,7 +8,6 @@ namespace SSRS_Subscription.Utils
 {
     public static class UrlParser
     {
-        // 1. Added the new File Share keys and DeliveryMethod to the ignore list
         private static readonly HashSet<string> TopLevelKeys = new(StringComparer.OrdinalIgnoreCase) 
         { 
             "report_path", "email_to", "subject", "comment", 
@@ -24,43 +23,60 @@ namespace SSRS_Subscription.Utils
 
             var queryParams = QueryHelpers.ParseQuery(uri.Query);
 
-            // Extract core path
+            // 1. Extract core path
             var reportPath = queryParams.TryGetValue("report_path", out var pathVal) ? pathVal.ToString() : string.Empty;
             if (string.IsNullOrWhiteSpace(reportPath))
             {
                 throw new ArgumentException("URL is missing the required parameter: 'report_path'.");
             }
 
-            // 2. Determine Delivery Method (Default to Email if not provided or misspelled)
+            // 2. Get base report name and clean it up (Fallback Subject)
+            var rawReportName = reportPath.TrimEnd('/').Split('/').LastOrDefault() ?? "Report";
+
+            if (rawReportName.EndsWith(".rpt", StringComparison.OrdinalIgnoreCase))
+                rawReportName = rawReportName.Substring(0, rawReportName.Length - 4);
+
+            if (rawReportName.StartsWith("rpt", StringComparison.OrdinalIgnoreCase))
+                rawReportName = rawReportName.Substring(3);
+
+            // 3. Extract Subject explicitly, or fallback to cleaned report name
+            var subject = queryParams.TryGetValue("subject", out var subVal) && !string.IsNullOrWhiteSpace(subVal.ToString()) 
+                ? subVal.ToString() 
+                : rawReportName;
+
+            // 4. Extract Email fields to get the username
+            var emailTo = queryParams.TryGetValue("email_to", out var emailVal) ? emailVal.ToString() : string.Empty;
+
+            var emailUsername = "System";
+            if (!string.IsNullOrWhiteSpace(emailTo) && emailTo.Contains('@'))
+            {
+                emailUsername = emailTo.Split('@')[0];
+            }
+
+            // 5. Create Timestamp and Final Filename (Format: subject_username_dateandtime)
+            var dateAndTimeOfCreation = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var dynamicFileName = $"{subject}_{emailUsername}_{dateAndTimeOfCreation}";
+
+            // 6. Determine Delivery Method
             var deliveryMethodStr = queryParams.TryGetValue("delivery_method", out var dmVal) ? dmVal.ToString() : "Email";
             if (!Enum.TryParse<DeliveryMethod>(deliveryMethodStr, true, out var deliveryMethod))
             {
                 deliveryMethod = DeliveryMethod.Email; 
             }
 
-            // Extract Email fields
-            var emailTo = queryParams.TryGetValue("email_to", out var emailVal) ? emailVal.ToString() : string.Empty;
-            
-            // 3. Conditional Validation based on Delivery Method
+            // Conditional Validation based on Delivery Method
             if (deliveryMethod == DeliveryMethod.Email && string.IsNullOrWhiteSpace(emailTo))
             {
                 throw new ArgumentException("URL is missing the required parameter 'email_to' for Email delivery.");
             }
 
-            // Extract File Share fields
+            // 7. Extract remaining File Share fields and comment
             var filePath = queryParams.TryGetValue("file_path", out var fpVal) ? fpVal.ToString() : string.Empty;
-            var fileName = queryParams.TryGetValue("file_name", out var fnVal) ? fnVal.ToString() : string.Empty;
             var fileUsername = queryParams.TryGetValue("file_username", out var fuVal) ? fuVal.ToString() : string.Empty;
             var filePassword = queryParams.TryGetValue("file_password", out var fpassVal) ? fpassVal.ToString() : string.Empty;
-
-            // Extract Subject (prioritize URL parameter, fallback to report name)
-            var subject = queryParams.TryGetValue("subject", out var subVal) && !string.IsNullOrWhiteSpace(subVal.ToString()) 
-                ? subVal.ToString() 
-                : reportPath.TrimEnd('/').Split('/').LastOrDefault() ?? string.Empty;
-
             var comment = queryParams.TryGetValue("comment", out var commentVal) ? commentVal.ToString() : string.Empty;
 
-            // Extract dynamic SSRS Report Parameters
+            // 8. Extract dynamic SSRS Report Parameters
             var parameters = queryParams
                 .Where(kvp => !TopLevelKeys.Contains(kvp.Key))
                 .ToDictionary(
@@ -73,18 +89,18 @@ namespace SSRS_Subscription.Utils
                 ReportPath = reportPath,
                 DeliveryMethod = deliveryMethod,
                 
-                // Email fields
                 EmailTo = emailTo,
                 Subject = subject,
                 Comment = comment,
                 
-                // File Share fields
                 FilePath = filePath,
-                FileName = fileName,
+                
+                // ✅ FORCE the dynamic filename here! No more fallbacks to "@ReportName"
+                FileName = dynamicFileName, 
+                
                 FileUserName = fileUsername,
                 FilePassword = filePassword,
                 
-                // SSRS Parameters
                 Parameters = parameters
             };
         }

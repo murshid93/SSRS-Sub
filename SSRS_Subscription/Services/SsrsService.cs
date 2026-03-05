@@ -203,8 +203,8 @@ namespace SSRS_Subscription.Services
             return string.Empty;
         }
 
-        // ✅ NEW: Background Polling Method
-        // ✅ NEW: Background Polling Method (Simplified)
+        
+        // ✅ NEW: Background Polling Method 
         public async Task PollAndNotifyAsync(string subscriptionId, string emailTo, string subject, string fallbackPath)
         {
             int maxAttempts = 30; // Max 5 minutes
