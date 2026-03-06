@@ -109,5 +109,26 @@ namespace SSRS_Subscription.Controllers
                 return StatusCode(500, new { detail = ex.Message });
             }
         }
+
+        // ✅ Route 3: Delete all API-generated subscriptions (Cleanup)
+        [HttpDelete("cleanup-api-subscriptions")]
+        public async Task<IActionResult> CleanupApiSubscriptions()
+        {
+            try
+            {
+                // Call our new service method
+                int count = await _service.DeleteApiTriggeredSubscriptionsAsync();
+
+                return Ok(new
+                {
+                    status = "success",
+                    message = $"Successfully deleted {count} API-triggered subscriptions from the Report Server."
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { detail = ex.Message });
+            }
+        }
     }
 }

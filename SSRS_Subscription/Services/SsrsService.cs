@@ -238,5 +238,42 @@ namespace SSRS_Subscription.Services
             }
             Console.WriteLine($"[TIMEOUT] Stopped polling {subscriptionId}.");
         }
+
+        // ✅ NEW: Housekeeping method to delete all API-generated subscriptions
+        public async Task<int> DeleteApiTriggeredSubscriptionsAsync()
+        {
+            // 1. Fetch all subscriptions from the report server
+            var response = await _httpClient.GetAsync("Subscriptions");
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadFromJsonAsync<JsonElement>();
+            
+            if (!content.TryGetProperty("value", out var items) || items.GetArrayLength() == 0)
+            {
+                return 0; // No subscriptions found at all
+            }
+
+            int deletedCount = 0;
+
+            // 2. Iterate through all subscriptions
+            foreach (var item in items.EnumerateArray())
+            {
+                var description = item.GetProperty("Description").GetString() ?? string.Empty;
+                
+                // 3. Check if it was created by our API
+                if (description.StartsWith("API Triggered", StringComparison.OrdinalIgnoreCase))
+                {
+                    var subId = item.GetProperty("Id").GetString();
+                    if (!string.IsNullOrWhiteSpace(subId))
+                    {
+                        // Delete it using your existing method
+                        await DeleteSubscriptionAsync(subId);
+                        deletedCount++;
+                    }
+                }
+            }
+
+            return deletedCount;
+        }
     }
 }
