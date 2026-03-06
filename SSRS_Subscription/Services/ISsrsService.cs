@@ -17,5 +17,8 @@ namespace SSRS_Subscription.Services
         
         // 3. New method to handle the background polling loop and email notification
         Task PollAndNotifyAsync(string subscriptionId, string emailTo, string subject, string fallbackPath);
+
+        // ✅ NEW: Cleanup method
+        Task<int> DeleteApiTriggeredSubscriptionsAsync();
     }
 }
