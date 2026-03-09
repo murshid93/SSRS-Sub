@@ -13,7 +13,11 @@ namespace SSRS_Subscription.Models
         // General
         public string ReportPath { get; set; } = string.Empty;
         public DeliveryMethod DeliveryMethod { get; set; } = DeliveryMethod.Email; // Default to email
-        public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
+
+        public int ScheduleMinutes { get; set; } 
+        
+        public Dictionary<string, object> Parameters { get; set; } = new();
+        //public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
 
         // Email Specific
         public string EmailTo { get; set; } = string.Empty;
