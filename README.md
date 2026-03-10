@@ -66,8 +66,7 @@ This API acts as a lightweight middleware, allowing applications to trigger SSRS
 ## Features
 * **Dynamic URL Parsing:** Automatically extracts standard routing parameters and passes any custom dynamic parameters (like `Chain` or `Branch`) directly to the SSRS report.
 * **Dual Delivery Methods:** Seamlessly route reports to either an Email inbox or a Network File Share.
-* **Fire-and-Forget Architecture:** API responds instantly (zero timeouts), while a background thread monitors the SSRS rendering status.
-* **Smart Notifications:** When using File Share delivery, providing an email address will automatically trigger a success notification containing the exact network path of the generated file.
+
 
 ## Configuration
 
@@ -114,6 +113,7 @@ email_to	Conditional	Required for Email delivery. For File Share, providing this
 file_name	No	        Desired name for the output file (FileShare only).
 subject	No	Email subject line.
 comment	No	Body text for Email delivery.
+schedule_minutes  No  The Queue minutes before the subscription is generated the report
 (Any additional query parameters, like &Chain=GNG&Branch=GAAL, will be passed directly to the SSRS report).
 
 Example Payloads
@@ -121,16 +121,28 @@ Example Payloads
 This payload triggers a report to be generated and saved to the default network file share. Because email_to is included, the API will poll SSRS in the background and send an email to user@aspial.com containing the exact file path once the PDF is successfully saved
 
 { 
-  "url": "[https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=FileShare&email_to=user@aspial.com&file_name=TradeInSummary&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew](https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=FileShare&email_to=murshid_p@aspial.com&file_name=TradeInSummary&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew)" 
+  "url": "[https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=FileShare&email_to=user@aspial.com&file_name=TradeInSummary&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew](https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=FileShare&email_to=murshid_p@aspial.com&file_name=TradeInSummary&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew&schedule_minutes=10)" 
 }
 2. Direct Email Delivery
 This payload bypasses the file share and instructs SSRS to email the generated report directly as an attachment.
 
 { 
-  "url": "[https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=Email&email_to=murshid_p%40aspial.com&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew](https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=Email&email_to=murshid_p%40aspial.com&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew)" 
+  "url": "[https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=Email&email_to=murshid_p%40aspial.com&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew](https://dummy.com/?report_path=/LEGACY_IMS/MCJG/Trade%20in%20Report%20%28Summary%29/rptTradeinSummarybyCategory&delivery_method=Email&email_to=murshid_p%40aspial.com&subject=rptTradeinSummarybyCategory&comment=Generated%20via%20API&Chain=GNG&Branch=GAAL&Branch=GABK&Branch=GACP&Branch=GAGY&Branch=GAHF&Method=ALL&CategoryType=Gold&CategoryType=Jew&schedule_minutes=10)" 
 }
 
-Background Polling: Long-running reports do not block HTTP traffic. The controller instantly returns a 200 OK response while spawning an IServiceScopeFactory thread to safely monitor SSRS job completion in the background.
+Post-Processing & Cleanup Endpoint
+POST /api/process-completed
+
+This endpoint acts as the dedicated notification dispatcher and garbage collector for your SSRS server. Because the API uses a decoupled architecture, this route should be triggered periodically (e.g., via a Cron job or Windows Task Scheduler).
+
+Upon execution, it sweeps the SSRS server for finished API-generated tasks and performs the following operations based on the delivery type:
+
+For File Share Subscriptions: Identifies jobs where the report has been successfully saved to the network drive. It safely extracts the final file path, dispatches an Office 365 SMTP notification to the designated user, and permanently deletes the subscription.
+
+For Email Subscriptions: Identifies jobs where SSRS has successfully delivered the email attachment to the user. It immediately deletes the subscription to prevent database bloat and maintain server hygiene.
+
+
+
 
 
 
