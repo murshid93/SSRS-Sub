@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,6 +7,7 @@
     
     <RestoreFallbackFolders>clear</RestoreFallbackFolders>
     <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    <UserSecretsId>b6873269-5892-457a-836e-cf83142d7184</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
