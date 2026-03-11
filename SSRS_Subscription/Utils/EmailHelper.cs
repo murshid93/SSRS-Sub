@@ -6,7 +6,6 @@ namespace SSRS_Subscription.Utils
 {
     public static class EmailHelper
     {
-        // Added smtpUser and smtpPass to the parameters
         public static async Task SendFileReadyNotificationAsync(string toEmail, string subject, string filePath, string smtpServer, int port, string senderEmail, string smtpUser, string smtpPass)
         {
             try
@@ -35,7 +34,7 @@ namespace SSRS_Subscription.Utils
 
                 using var smtpClient = new SmtpClient(smtpServer, port);
                 
-                // Office 365 Requirements: Explicit credentials and SSL enabled
+                // Explicit credentials and SSL enabled
                 smtpClient.UseDefaultCredentials = false;
                 smtpClient.Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass);
                 smtpClient.EnableSsl = true; 

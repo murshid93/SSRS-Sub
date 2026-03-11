@@ -8,7 +8,7 @@ namespace SSRS_Subscription.Utils
 {
     public static class UrlParser
     {
-        // ✅ Added "schedule_minutes" to the top-level keys
+    
         private static readonly HashSet<string> TopLevelKeys = new(StringComparer.OrdinalIgnoreCase) 
         { 
             "report_path", "email_to", "subject", "comment", 
@@ -66,7 +66,6 @@ namespace SSRS_Subscription.Utils
             var filePassword = queryParams.TryGetValue("file_password", out var fpassVal) ? fpassVal.ToString() : string.Empty;
             var comment = queryParams.TryGetValue("comment", out var commentVal) ? commentVal.ToString() : string.Empty;
 
-            // ✅ Extract schedule minutes (defaults to 0 if not provided)
             var scheduleStr = queryParams.TryGetValue("schedule_minutes", out var schedVal) ? schedVal.ToString() : "0";
             int.TryParse(scheduleStr, out int scheduleMinutes);
 
@@ -88,7 +87,7 @@ namespace SSRS_Subscription.Utils
                 FileName = dynamicFileName, 
                 FileUserName = fileUsername,
                 FilePassword = filePassword,
-                ScheduleMinutes = scheduleMinutes, // ✅ Assigned here
+                ScheduleMinutes = scheduleMinutes, 
                 Parameters = parameters
             };
         }

@@ -71,7 +71,7 @@ namespace SSRS_Subscription.Controllers
             }
         }
 
-        // ✅ NEW: The Batch Cleanup Endpoint
+        //The Batch Cleanup Endpoint
         [HttpPost("process-completed")]
         public async Task<IActionResult> ProcessCompletedSubscriptions()
         {

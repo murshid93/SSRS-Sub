@@ -21,8 +21,7 @@ namespace SSRS_Subscription.Utils
             // 1. Create the cache
             var credentialCache = new CredentialCache();
 
-            // 2. Explicitly tie the credentials to the NTLM scheme and your SSRS Base URL
-            // Make sure settings.BaseUrl matches the exact base address (e.g., "http://your-ssrs-server/")
+            // 2. Add the NetworkCredential to the cache for the specific URL and NTLM scheme
             credentialCache.Add(new Uri(settings.BaseUrl), "NTLM", networkCredential);
 
             return new HttpClientHandler
@@ -30,7 +29,6 @@ namespace SSRS_Subscription.Utils
                 // 3. Assign the cache instead of the raw NetworkCredential
                 Credentials = credentialCache, 
                 
-                // Optional but recommended for NTLM environments to reuse connections
                 PreAuthenticate = true 
             };
         }

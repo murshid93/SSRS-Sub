@@ -97,10 +97,9 @@ namespace SSRS_Subscription.Services
                 };
             }
 
-            // Embed metadata into Description so the cleanup job knows who to email later
             var descriptionMetadata = $"API Triggered | {request.DeliveryMethod} | {request.EmailTo} | {request.Subject}";
 
-            // Set the Delay (If they pass 0, default to 1 minute so it runs "immediately")
+            
             int delayMinutes = request.ScheduleMinutes > 0 ? request.ScheduleMinutes : 1; 
 
             var payload = new
@@ -113,7 +112,7 @@ namespace SSRS_Subscription.Services
                 {
                     Definition = new
                     {
-                        // Add the delayMinutes to the Current UTC Time
+                        
                         StartDateTime = DateTime.UtcNow.AddMinutes(delayMinutes).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                         EndDateSpecified = false,
                         Recurrence = new
@@ -147,7 +146,7 @@ namespace SSRS_Subscription.Services
             response.EnsureSuccessStatusCode();
         }
 
-        // The New Batch Processing & Cleanup Method
+        
         public async Task<int> ProcessAndCleanupCompletedSubscriptionsAsync()
         {
             var response = await _httpClient.GetAsync("Subscriptions");
@@ -165,19 +164,19 @@ namespace SSRS_Subscription.Services
 
             foreach (var item in items.EnumerateArray())
             {
-                // SAFELY extract properties without crashing if the case is wrong
+                
                 var description = item.TryGetProperty("Description", out var descProp) ? descProp.GetString() ?? "" : "";
                 var status = item.TryGetProperty("LastStatus", out var statusProp) ? statusProp.GetString() ?? "" : "";
                 var subId = item.TryGetProperty("Id", out var idProp) ? idProp.GetString() : "";
 
-                // Only evaluate subscriptions made by our API
+                
                 if (description.StartsWith("API Triggered", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine($"\n[DEBUG] Found API Sub: {subId}");
                     Console.WriteLine($"[DEBUG] Description: {description}");
                     Console.WriteLine($"[DEBUG] Status: {status}");
 
-                    // Make sure it's the NEW format with pipes, otherwise we can't extract the email!
+                    
                     if (!description.Contains("|"))
                     {
                         Console.WriteLine("[DEBUG] -> SKIPPING: This subscription uses the old description format. Please delete it manually.");
@@ -194,14 +193,14 @@ namespace SSRS_Subscription.Services
                             var emailTo = parts.Length > 2 ? parts[2].Trim() : "";
                             var subject = parts.Length > 3 ? parts[3].Trim() : "Report";
 
-                            // Send FileShare notification
+                           
                             if (deliveryMethod.Equals("FileShare", StringComparison.OrdinalIgnoreCase) && 
                                 status.Contains("has been saved", StringComparison.OrdinalIgnoreCase) && 
                                 !string.IsNullOrWhiteSpace(emailTo))
                             {
                                 string fullPath = "";
 
-                                // Extract exact file name and path directly from the SSRS Status message
+                                
                                 try 
                                 {
                                     int fileStart = status.IndexOf('"') + 1;
@@ -216,7 +215,7 @@ namespace SSRS_Subscription.Services
                                 }
                                 catch 
                                 {
-                                    // Fallback just in case the status string format ever changes
+                        
                                     fullPath = "your network folder"; 
                                 }
 
@@ -231,7 +230,7 @@ namespace SSRS_Subscription.Services
                                 await EmailHelper.SendFileReadyNotificationAsync(emailTo, subject, fullPath, smtpServer, smtpPort, senderEmail, smtpUser, smtpPass);
                             }
 
-                            // Finally, delete the subscription
+                            
                             await DeleteSubscriptionAsync(subId!);
                             Console.WriteLine($"[DEBUG] -> Successfully DELETED subscription {subId}");
                             processedCount++;
@@ -250,31 +249,5 @@ namespace SSRS_Subscription.Services
             return processedCount;
         }
 
-        // Keep this just in case you need to do a manual wipe
-        public async Task<int> DeleteApiTriggeredSubscriptionsAsync()
-        {
-            var response = await _httpClient.GetAsync("Subscriptions");
-            response.EnsureSuccessStatusCode();
-
-            var content = await response.Content.ReadFromJsonAsync<JsonElement>();
-            
-            if (!content.TryGetProperty("value", out var items) || items.GetArrayLength() == 0) return 0;
-
-            int deletedCount = 0;
-            foreach (var item in items.EnumerateArray())
-            {
-                var description = item.TryGetProperty("Description", out var d) ? d.GetString() ?? "" : "";
-                if (description.StartsWith("API Triggered", StringComparison.OrdinalIgnoreCase))
-                {
-                    var subId = item.GetProperty("Id").GetString();
-                    if (!string.IsNullOrWhiteSpace(subId))
-                    {
-                        await DeleteSubscriptionAsync(subId);
-                        deletedCount++;
-                    }
-                }
-            }
-            return deletedCount;
-        }
     }
 }
