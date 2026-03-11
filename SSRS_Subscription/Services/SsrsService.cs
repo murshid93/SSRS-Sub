@@ -147,7 +147,7 @@ namespace SSRS_Subscription.Services
             response.EnsureSuccessStatusCode();
         }
 
-        // The New Batch Processing & Cleanup Method (BULLETPROOF VERSION)
+        // The New Batch Processing & Cleanup Method
         public async Task<int> ProcessAndCleanupCompletedSubscriptionsAsync()
         {
             var response = await _httpClient.GetAsync("Subscriptions");
@@ -185,9 +185,7 @@ namespace SSRS_Subscription.Services
                     }
 
                     if (status.Contains("has been saved", StringComparison.OrdinalIgnoreCase) ||
-                        status.Contains("Mail sent to", StringComparison.OrdinalIgnoreCase) ||
-                        status.Contains("Failure", StringComparison.OrdinalIgnoreCase) ||
-                        status.Contains("Error", StringComparison.OrdinalIgnoreCase))
+                        status.Contains("Mail sent to", StringComparison.OrdinalIgnoreCase))
                     {
                         try
                         {
